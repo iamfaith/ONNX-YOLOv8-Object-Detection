@@ -5,12 +5,36 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File",
-            "type": "debugpy",
+            "name": "Python: Current File",
+            "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "gcc-7 - Build and debug active file",
+            "type": "cppdbg",
+            "request": "launch",
+            // "program": "${fileDirname}/../build/refactor/${fileBasenameNoExtension}",
+            // "program": "${fileDirname}/../../build/examples/hello/${fileBasenameNoExtension}",
+            "program": "${fileDirname}/build/pnnx",
+            // "program": "${fileDirname}/../build/models/${fileBasenameNoExtension}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "C/C++: gcc-7 build active file",
+            "miDebuggerPath": "/usr/bin/gdb"
         }
     ]
 }

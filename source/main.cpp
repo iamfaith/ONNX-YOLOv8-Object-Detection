@@ -14,7 +14,7 @@ int main()
     std::vector<std::string> customop_modules;
     std::vector<std::string> module_operators;
     pnnx::Graph pnnx_graph;
-    std::string ptpath = "/home/faith/ONNX-YOLOv8-Object-Detection/yolov8n.onnx";
+    std::string ptpath = "/home/faith/ONNX-YOLOv8-Object-Detection/models/yolov8n-sim.onnx";
     pnnx::load_onnx(ptpath.c_str(), pnnx_graph,
               input_shapes, input_types,
               input_shapes2, input_types2);

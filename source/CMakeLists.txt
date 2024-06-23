@@ -1,4 +1,8 @@
 
+
+set(CMAKE_BUILD_TYPE Debug)
+# set(CMAKE_BUILD_TYPE Release)
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 list(APPEND CMAKE_PREFIX_PATH "/home/faith/protobuf-3.20.0/build")

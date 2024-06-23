@@ -515,6 +515,46 @@ static double get_current_time()
 //     return true;
 // }
 
+struct NodeInfo {
+    std::string nodeName;
+    std::vector<int> shapes;
+
+    NodeInfo(const std::string& name):nodeName(name) {}
+
+    bool operator==(const NodeInfo & other) const {
+        return nodeName == other.nodeName;
+    }
+
+    bool operator>(const NodeInfo & other) const {
+        return nodeName > other.nodeName;
+    }
+
+    bool operator<(const NodeInfo & other) const {
+        return nodeName < other.nodeName;
+    }
+
+    bool operator!=(const NodeInfo & other) const {
+        return nodeName != other.nodeName;
+    }
+
+    void insert(int val) {
+        shapes.push_back(val);
+    }
+
+    
+};
+
+std::ostream& operator<<(std::ostream& stream, const NodeInfo& info) {
+    if (info.shapes.size() == 0) {
+        stream << info.nodeName << " " << "shape:[";
+        for (auto shape: info.shapes)
+            stream << shape << " ";
+        stream << "]";
+    }
+    return stream;    
+}
+
+
 int load_onnx(const std::string& onnxpath, Graph& pnnx_graph,
               const std::vector<std::vector<int64_t> >& input_shapes,
               const std::vector<std::string>& input_types,
@@ -538,11 +578,14 @@ int load_onnx(const std::string& onnxpath, Graph& pnnx_graph,
         fprintf(stderr, "input_shape expect %d tensors but got %d\n", graph.input_size(), (int)input_shapes.size());
         return false;
     }
-
+    std::set<NodeInfo> node_infos;
     fprintf(stdout, "---- %d\n", graph.input_size());
     for (int i = 0; i < graph.input_size(); i++)
     {
         const std::string& input = graph.input(i).name();
+
+        NodeInfo temp(input);
+        
         // const onnx::ValueInfoProto& value = graph.input(i);
         const onnx::ValueInfoProto& value = modelproxy.valueinfo(input);
 
@@ -556,27 +599,87 @@ int load_onnx(const std::string& onnxpath, Graph& pnnx_graph,
                 continue;
 
             int64_t ds = tsp.dim(j).dim_value();
+            temp.insert((int)ds);
             fprintf(stdout, "dim: %d val: %d\n", j, ds);
         }
+        node_infos.insert(temp);
     }
+    
 
     for (int i = 0; i < graph.node_size(); i++)
     {
         const onnx::NodeProto& node = graph.node(i);
         std::string op_type = node.op_type();
 
-        std::cout << node.name() << " " << op_type << std::endl;
         std::cout << "--------------------" << std::endl;
+        std::cout << node.name() << " " << op_type << std::endl;
         for (int j = 0; j < node.input_size(); j++)
         {
             const std::string& input = node.input(j);
+            
+            if (input.empty())
+                continue;
+            // const onnx::ValueInfoProto& value = modelproxy.valueinfo(input);
             std::cout << "input: " << j << " "<< input << std::endl;
+            Operand* op_in = pnnx_graph.get_operand(input);
+            if (!op_in && modelproxy.has_initializer(input))
+            {
+                NodeInfo temp(input);
+                // node_infos.insert(temp);
+
+                const onnx::TensorProto& tensor = modelproxy.initializer(input);
+                for (int k = 0; k < tensor.dims_size(); k++)
+                {
+                    fprintf(stdout,"[%d: %d]",k, tensor.dims(k));
+                    temp.insert(tensor.dims(k));
+                }
+                if (tensor.dims_size() == 0 && tensor.has_raw_data()) {
+                     if (tensor.data_type() == onnx::TensorProto::FLOAT)
+                    {
+                        // assert tensor.raw_data().size() == 4
+                        float val = ((float*)tensor.raw_data().data())[0];
+                        std::cout << val << std::endl;
+                    }
+                }
+                node_infos.insert(temp);
+                std::cout << std::endl;
+            } else {
+                // if (node_infos.count(input) == 0) {
+                //     std::cout << "+++++[no input info:]" << input << " " << op_in << std::endl;
+                //     exit(0);
+                // }
+            }
+            
+  
         }
 
         for (int j = 0; j < node.output_size(); j++)
         {
             const std::string& output = node.output(j);
+            if (output.empty())
+                continue;
+            const onnx::ValueInfoProto& value = modelproxy.valueinfo(output);
             std::cout << "output: " << j << " " << output << std::endl;
+            const onnx::TensorShapeProto& tsp = value.type().tensor_type().shape();
+
+            fprintf(stdout, "%d  type:%d dim_size: %d %s\n", i,  value.type().tensor_type().elem_type(), tsp.dim_size(), output.c_str());
+            
+            NodeInfo temp(output);
+
+            for (int j = 0; j < tsp.dim_size(); j++)
+            {
+                if (!tsp.dim(j).has_dim_value())
+                    continue;
+
+                int64_t ds = tsp.dim(j).dim_value();
+                fprintf(stdout, "dim: %d val: %d\n", j, ds);
+                temp.insert(ds);
+            }
+            if (tsp.dim_size() > 0) {
+                node_infos.insert(temp);
+            } else {
+                std::cout << "no insert" << std::endl;
+            }
 
         }
         for (int j = 0; j < node.attribute_size(); j++)
@@ -584,7 +687,7 @@ int load_onnx(const std::string& onnxpath, Graph& pnnx_graph,
             const onnx::AttributeProto& attr = node.attribute(j);
             std::cout << "attr: " << j << " "<< attr.name() << std::endl;
         }
-        std::cout << "--------------------" << std::endl;
+        // std::cout << "--------------------" << std::endl;
     }
 
 
@@ -709,6 +812,10 @@ int load_onnx(const std::string& onnxpath, Graph& pnnx_graph,
 
     pass_onnx(model, pnnx_graph);
 
+    for (auto itr: node_infos) {
+        std::cout << itr << std::endl;
+    }
+    
     return 0;
 }
 
