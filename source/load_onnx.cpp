@@ -15,7 +15,7 @@
 #include "load_onnx.h"
 
 #include "onnx.pb.h"
-
+#include <iostream>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/message.h>
@@ -531,6 +531,62 @@ int load_onnx(const std::string& onnxpath, Graph& pnnx_graph,
     }
 
     const onnx::GraphProto& graph = model.graph();
+    onnx2pnnx::OnnxModelProxy modelproxy(model);
+
+    if (!input_shapes.empty() && (int)input_shapes.size() != graph.input_size())
+    {
+        fprintf(stderr, "input_shape expect %d tensors but got %d\n", graph.input_size(), (int)input_shapes.size());
+        return false;
+    }
+
+    fprintf(stdout, "---- %d\n", graph.input_size());
+    for (int i = 0; i < graph.input_size(); i++)
+    {
+        const std::string& input = graph.input(i).name();
+        // const onnx::ValueInfoProto& value = graph.input(i);
+        const onnx::ValueInfoProto& value = modelproxy.valueinfo(input);
+
+        const onnx::TensorShapeProto& tsp = value.type().tensor_type().shape();
+
+        fprintf(stdout, "%d  type:%d dim_size: %d %s\n", i,  value.type().tensor_type().elem_type(), tsp.dim_size(), input.c_str());
+        
+        for (int j = 0; j < tsp.dim_size(); j++)
+        {
+            if (!tsp.dim(j).has_dim_value())
+                continue;
+
+            int64_t ds = tsp.dim(j).dim_value();
+            fprintf(stdout, "dim: %d val: %d\n", j, ds);
+        }
+    }
+
+    for (int i = 0; i < graph.node_size(); i++)
+    {
+        const onnx::NodeProto& node = graph.node(i);
+        std::string op_type = node.op_type();
+
+        std::cout << node.name() << " " << op_type << std::endl;
+        std::cout << "--------------------" << std::endl;
+        for (int j = 0; j < node.input_size(); j++)
+        {
+            const std::string& input = node.input(j);
+            std::cout << "input: " << j << " "<< input << std::endl;
+        }
+
+        for (int j = 0; j < node.output_size(); j++)
+        {
+            const std::string& output = node.output(j);
+            std::cout << "output: " << j << " " << output << std::endl;
+
+        }
+        for (int j = 0; j < node.attribute_size(); j++)
+        {
+            const onnx::AttributeProto& attr = node.attribute(j);
+            std::cout << "attr: " << j << " "<< attr.name() << std::endl;
+        }
+        std::cout << "--------------------" << std::endl;
+    }
+
 
     // input shape sanity check
     // if (!check_input_shape(model, input_shapes, input_types))
